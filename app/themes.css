@@ -1,0 +1,92 @@
+/* Tema claro (predeterminado) */
+.theme-light {
+  --primary-color: 22, 163, 74; /* green-600 */
+  --primary-light: 220, 252, 231; /* green-100 */
+  --primary-dark: 21, 128, 61; /* green-700 */
+  --background-color: 255, 255, 255;
+  --text-color: 17, 24, 39;
+  --border-color: 229, 231, 235;
+  --card-background: 255, 255, 255;
+  --hover-color: 240, 253, 244; /* green-50 */
+}
+
+/* Tema oscuro */
+.dark {
+  --primary-color: 34, 197, 94; /* green-500 */
+  --primary-light: 21, 128, 61; /* green-700 */
+  --primary-dark: 220, 252, 231; /* green-100 */
+  --background-color: 17, 24, 39; /* gray-900 */
+  --text-color: 243, 244, 246; /* gray-100 */
+  --border-color: 55, 65, 81; /* gray-700 */
+  --card-background: 31, 41, 55; /* gray-800 */
+  --hover-color: 55, 65, 81; /* gray-700 */
+}
+
+/* Tema azul */
+.theme-blue {
+  --primary-color: 37, 99, 235; /* blue-600 */
+  --primary-light: 219, 234, 254; /* blue-100 */
+  --primary-dark: 29, 78, 216; /* blue-700 */
+  --background-color: 255, 255, 255;
+  --text-color: 17, 24, 39;
+  --border-color: 229, 231, 235;
+  --card-background: 255, 255, 255;
+  --hover-color: 239, 246, 255; /* blue-50 */
+}
+
+/* Tema morado */
+.theme-purple {
+  --primary-color: 147, 51, 234; /* purple-600 */
+  --primary-light: 243, 232, 255; /* purple-100 */
+  --primary-dark: 126, 34, 206; /* purple-700 */
+  --background-color: 255, 255, 255;
+  --text-color: 17, 24, 39;
+  --border-color: 229, 231, 235;
+  --card-background: 255, 255, 255;
+  --hover-color: 250, 245, 255; /* purple-50 */
+}
+
+/* Variables CSS personalizadas para usar en la aplicación */
+:root {
+  --color-primary: rgb(var(--primary-color));
+  --color-primary-light: rgb(var(--primary-light));
+  --color-primary-dark: rgb(var(--primary-dark));
+  --color-background: rgb(var(--background-color));
+  --color-text: rgb(var(--text-color));
+  --color-border: rgb(var(--border-color));
+  --color-card-bg: rgb(var(--card-background));
+  --color-hover: rgb(var(--hover-color));
+}
+
+/* Clases de utilidad para usar con los temas */
+.bg-theme-primary {
+  background-color: rgb(var(--primary-color));
+}
+
+.text-theme-primary {
+  color: rgb(var(--primary-color));
+}
+
+.border-theme-primary {
+  border-color: rgb(var(--primary-color));
+}
+
+.bg-theme-background {
+  background-color: rgb(var(--background-color));
+}
+
+.text-theme-text {
+  color: rgb(var(--text-color));
+}
+
+.border-theme-border {
+  border-color: rgb(var(--border-color));
+}
+
+.bg-theme-card {
+  background-color: rgb(var(--card-background));
+}
+
+.hover\:bg-theme-hover:hover {
+  background-color: rgb(var(--hover-color));
+}
