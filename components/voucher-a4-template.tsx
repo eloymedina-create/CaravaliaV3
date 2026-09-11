@@ -62,10 +62,27 @@ export function VoucherA4Template({ vale }: VoucherTemplateProps) {
       {/* 3. CUERPO (Importe y Mensaje) */}
       <div className="flex-grow flex flex-col justify-center items-center">
         {/* Importe central limpio */}
-        <div className="mb-10 text-center">
-          <span className="text-[11px] font-bold uppercase opacity-50 block mb-2 tracking-widest">VALOR DEL BONO</span>
-          <span className="text-7xl font-black">{vale.importe.toFixed(0)}€</span>
-        </div>
+        {!vale.ocultarImporte ? (
+          <div className="mb-10 text-center">
+            <span className="text-[11px] font-bold uppercase opacity-50 block mb-2 tracking-widest">VALOR DEL BONO</span>
+            <span className="text-7xl font-black">{vale.importe.toFixed(0)}€</span>
+            {vale.diasAlquiler && vale.diasAlquiler > 0 && (
+              <div className="mt-4">
+                <span
+                  className="inline-block text-[13px] font-black uppercase tracking-widest border-2 border-[#003829] rounded-full px-6 py-2"
+                  style={{ letterSpacing: "0.15em" }}
+                >
+                  CORRESPONDE A {vale.diasAlquiler} {vale.diasAlquiler === 1 ? "DÍA" : "DÍAS"} DE ALQUILER
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="mb-10 text-center">
+            <span className="text-[11px] font-bold uppercase opacity-50 block mb-2 tracking-widest">EXPERIENCIA</span>
+            <span className="text-5xl font-black">AVENTURA SOBRE RUEDAS</span>
+          </div>
+        )}
 
         {/* Texto de dedicatoria */}
         <div className="text-center max-w-xl mb-12">
@@ -120,6 +137,33 @@ export function VoucherA4Template({ vale }: VoucherTemplateProps) {
                 style={{ width: "100%", height: "100%", objectFit: "contain" }}
               />
             </div>
+          </div>
+
+          {/* Sello de estado de pago */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: "35mm",
+              right: "25mm",
+              transform: "rotate(-15deg)",
+              border: vale.pagado ? "4px double #16a34a" : "4px double #dc2626",
+              borderRadius: "12px",
+              padding: "8px 20px",
+              opacity: 0.85,
+            }}
+          >
+            <span
+              style={{
+                fontSize: vale.pagado ? "24px" : "16px",
+                fontWeight: 900,
+                letterSpacing: "0.15em",
+                color: vale.pagado ? "#16a34a" : "#dc2626",
+                textTransform: "uppercase",
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              {vale.pagado ? "PAGADO" : "PENDIENTE DE PAGO"}
+            </span>
           </div>
         </div>
       </div>

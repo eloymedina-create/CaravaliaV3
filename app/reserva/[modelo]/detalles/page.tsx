@@ -452,6 +452,7 @@ export default function DetallesReservaPage({ params }: { params: Promise<{ mode
     }
 
     // Si NO es edición, sigue el flujo normal
+    const totalFinalNuevo = Number(importeTotalManual) || importeTotalCalc
     const reservaData = {
       numeroReserva,
       modelo,
@@ -466,7 +467,8 @@ export default function DetallesReservaPage({ params }: { params: Promise<{ mode
       importeVale: valeSeleccionado?.importe,
       cantidad,
       porcentaje,
-      importeTotal: Number(importeTotalManual) || importeTotalCalc,
+      porcentajeSenal,
+      importeTotal: totalFinalNuevo,
       importeSenal
     }
 

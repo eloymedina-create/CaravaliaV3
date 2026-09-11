@@ -8,3 +8,7 @@ node_modules
 .next/
 .env*.local
 .DS_Store
+_BACKUP_ESTADO_OK/
+node_modules/
+.next/
+

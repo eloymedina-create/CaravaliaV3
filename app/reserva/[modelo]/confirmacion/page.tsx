@@ -94,12 +94,17 @@ export default function ConfirmacionReservaPage({ params }: { params: Promise<{ 
         
         const importeRestanteFinal = importeTotal - importeVale - importeSenal
 
+        // Calcular el porcentaje real de la señal para mostrar en el PDF
+        const porcentajeRealSenal = parsedDetalles.porcentajeSenal
+          || (importeTotal > 0 ? Math.round((importeSenal / importeTotal) * 100) : config.porcentajeSenal)
+
         setPdfData({
           numeroReserva,
           modelo,
           reservaDetalles: {
             ...parsedDetalles,
-            formaPago
+            formaPago,
+            porcentaje: porcentajeRealSenal,
           },
           clienteData: parsedCliente,
           totalDias: dias,

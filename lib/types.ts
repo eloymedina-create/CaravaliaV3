@@ -60,6 +60,10 @@ export interface ValeDescuento {
     telefono: string
   }
   importe: number
+  ocultarImporte?: boolean // Indica si no se debe mostrar el importe en el PDF (vale regalo)
+  anotaciones?: string // Notas internas sobre el vale
+  pagado?: boolean // true = pagado, false/undefined = pendiente de pago
+  diasAlquiler?: number // Días de alquiler si el vale se creó por días (opcional)
   estado: "disponible" | "asignado"
   reservaId?: string // ID de la reserva a la que se ha asignado
   fechaCreacion: string

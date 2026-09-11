@@ -238,7 +238,7 @@ export default function HomePage() {
         <div className="mt-16 w-full flex flex-col items-center">
           <div className="w-full border-t border-dashed border-[#c0c9c3] mb-6"></div>
           <p className="text-[11px] font-headline tracking-[0.2em] font-medium uppercase text-[#707974]">
-            © V3 E.Medina 2026
+            © V3.2 E.Medina 2026
           </p>
         </div>
 
