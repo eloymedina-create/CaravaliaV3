@@ -1,0 +1,89 @@
+﻿   Ôû▓ Next.js 15.2.8
+
+   Creating an optimized production build ...
+ Ô£ô Compiled successfully
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...
+   Generating static pages (0/16) ...
+   Generating static pages (4/16) 
+   Generating static pages (8/16) 
+node.exe : Error al obtener las 
+credenciales de Supabase: 
+ReferenceError: localStorage is 
+not defined
+En C:\Program 
+Files\nodejs\npx.ps1: 29 
+Carácter: 3
++   & $NODE_EXE $NPX_CLI_JS 
+$args
++   
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : N 
+   otSpecified: (Error al obte  
+  ne... is not defined:String   
+ ) [], RemoteException
+    + FullyQualifiedErrorId : N 
+   ativeCommandError
+ 
+    at s (C:\Users\eloym\Downloa
+ds\Aplicaciones\Caravalia\.next\
+server\chunks\66.js:41:818)
+    at l (C:\Users\eloym\Downloa
+ds\Aplicaciones\Caravalia\.next\
+server\chunks\66.js:41:1061)
+    at 20554 (C:\Users\eloym\Dow
+nloads\Aplicaciones\Caravalia\.n
+ext\server\chunks\66.js:41:1187)
+    at t (C:\Users\eloym\Downloa
+ds\Aplicaciones\Caravalia\.next\
+server\webpack-runtime.js:1:128)
+    at 2714 (C:\Users\eloym\Down
+loads\Aplicaciones\Caravalia\.ne
+xt\server\chunks\66.js:1:175)
+    at t (C:\Users\eloym\Downloa
+ds\Aplicaciones\Caravalia\.next\
+server\webpack-runtime.js:1:128)
+    at 11482 (C:\Users\eloym\Dow
+nloads\Aplicaciones\Caravalia\.n
+ext\server\app\sincronizar\page.
+js:1:1346)
+    at Object.t [as require] (C:
+\Users\eloym\Downloads\Aplicacio
+nes\Caravalia\.next\server\webpa
+ck-runtime.js:1:128)
+Creando cliente Supabase con URL: https://iwthoqggtcihcnzsaxnl.supabase.co
+   Generating static pages (12/16) 
+ Ô£ô Generating static pages (16/16)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+Ôöî Ôùï /                                      11 kB         341 kB
+Ôö£ Ôùï /_not-found                            990 B         102 kB
+Ôö£ Ôùï /admin                               5.33 kB         134 kB
+Ôö£ Ôùï /autocaravanas                       6.03 kB         135 kB
+Ôö£ Ôùï /ayuda                               6.12 kB         129 kB
+Ôö£ Ôùï /configuracion                       14.4 kB         252 kB
+Ôö£ Ôùï /diagnostico                         9.68 kB         188 kB
+Ôö£ Ôùï /documentos                          46.6 kB         198 kB
+Ôö£ Ôùï /iconos-muestra                      1.95 kB         109 kB
+Ôö£ Ôùï /login                               3.46 kB         118 kB
+Ôö£ Ôùï /precios                             24.8 kB         363 kB
+Ôö£ Ôùï /rentabilidad                        60.1 kB         441 kB
+Ôö£ ãÆ /reserva/[modelo]                    2.96 kB         129 kB
+Ôö£ ãÆ /reserva/[modelo]/cliente            4.61 kB         131 kB
+Ôö£ ãÆ /reserva/[modelo]/confirmacion       9.08 kB         346 kB
+Ôö£ ãÆ /reserva/[modelo]/detalles           6.25 kB         158 kB
+Ôö£ ãÆ /reserva/[modelo]/imprimir           2.06 kB         128 kB
+Ôö£ Ôùï /reservas                             121 kB         443 kB
+Ôöö Ôùï /sincronizar                         8.09 kB         309 kB
++ First Load JS shared by all             101 kB
+  Ôö£ chunks/1684-292b7d2044656a3f.js      45.8 kB
+  Ôö£ chunks/4bd1b696-b70d3b0eea5a05aa.js  53.3 kB
+  Ôöö other shared chunks (total)          2.26 kB
+
+
+Ôùï  (Static)   prerendered as static content
+ãÆ  (Dynamic)  server-rendered on demand
+
