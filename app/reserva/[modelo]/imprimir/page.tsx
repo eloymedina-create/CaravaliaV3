@@ -7,6 +7,7 @@ import { PrinterIcon } from "lucide-react"
 import { ReservationA4Template } from "@/components/reservation-a4-template"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { calcularDiasAlquiler } from "@/lib/utils-date"
 
 export default function ImprimirReservaPage({ params }: { params: Promise<{ modelo: string }> }) {
   const resolvedParams = use(params)
@@ -38,14 +39,8 @@ export default function ImprimirReservaPage({ params }: { params: Promise<{ mode
       const fechaEntrega = new Date(detalles.fechaEntrega)
       const fechaDevolucion = new Date(detalles.fechaDevolucion)
 
-      // Reset the time part to ensure we're only comparing dates, not times
-      const startDate = new Date(fechaEntrega.getFullYear(), fechaEntrega.getMonth(), fechaEntrega.getDate())
-      const endDate = new Date(fechaDevolucion.getFullYear(), fechaDevolucion.getMonth(), fechaDevolucion.getDate())
-
-      // Calculate difference in days and add 1 to include both start and end dates
-      const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      const dias = diffDays + 1
+      // Cálculo de días por calendario natural, blindado contra cambios de horario nocturnos
+      const dias = calcularDiasAlquiler(fechaEntrega, fechaDevolucion)
 
       setTotalDias(dias)
 

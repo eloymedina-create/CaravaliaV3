@@ -11,6 +11,7 @@ import {
   restaurarTodasPlantillas,
   type PlantillaDocumento,
 } from "@/lib/plantillas-store"
+import { calcularDiasAlquiler } from "@/lib/utils-date"
 import { MarkdownEditor } from "@/components/markdown-editor"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -267,12 +268,8 @@ export default function DocumentosPage() {
             const dFin = new Date(presupuestoData.fechaFin + "T12:00:00")
             fFinStr = format(dFin, "d 'de' MMMM", { locale: es })
             
-            // Cálculo de días tal cual se hace en las reservas (Inicio a Fin inclusive)
-            const start = new Date(dIni.getFullYear(), dIni.getMonth(), dIni.getDate())
-            const end = new Date(dFin.getFullYear(), dFin.getMonth(), dFin.getDate())
-            const diffTime = Math.abs(end.getTime() - start.getTime())
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-            diasCalculados = diffDays + 1
+            // Cálculo de días por calendario natural, blindado contra cambios de horario nocturnos
+            diasCalculados = calcularDiasAlquiler(presupuestoData.fechaInicio, presupuestoData.fechaFin)
           }
         }
       } catch (e) {
@@ -317,12 +314,7 @@ export default function DocumentosPage() {
     
     if (presupuestoData.fechaInicio && presupuestoData.fechaFin) {
       try {
-        const dIni = new Date(presupuestoData.fechaInicio + "T12:00:00")
-        const dFin = new Date(presupuestoData.fechaFin + "T12:00:00")
-        const start = new Date(dIni.getFullYear(), dIni.getMonth(), dIni.getDate())
-        const end = new Date(dFin.getFullYear(), dFin.getMonth(), dFin.getDate())
-        const diffTime = Math.abs(end.getTime() - start.getTime())
-        return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+        return calcularDiasAlquiler(presupuestoData.fechaInicio, presupuestoData.fechaFin)
       } catch (e) { return 0 }
     }
     return 0
@@ -652,7 +644,11 @@ export default function DocumentosPage() {
                         <Input 
                           type="date" 
                           value={presupuestoData.fechaInicio} 
-                          onChange={(e) => setPresupuestoData({...presupuestoData, fechaInicio: e.target.value, fechaFin: e.target.value})}
+                          onChange={(e) => {
+                            const newIni = e.target.value
+                            const newFin = (!presupuestoData.fechaFin || presupuestoData.fechaFin < newIni) ? newIni : presupuestoData.fechaFin
+                            setPresupuestoData({...presupuestoData, fechaInicio: newIni, fechaFin: newFin})
+                          }}
                           className="h-12"
                         />
                       </div>
@@ -797,7 +793,11 @@ export default function DocumentosPage() {
                       <Input 
                         type="date" 
                         value={presupuestoData.fechaInicio} 
-                        onChange={(e) => setPresupuestoData({...presupuestoData, fechaInicio: e.target.value, fechaFin: e.target.value})}
+                        onChange={(e) => {
+                          const newIni = e.target.value
+                          const newFin = (!presupuestoData.fechaFin || presupuestoData.fechaFin < newIni) ? newIni : presupuestoData.fechaFin
+                          setPresupuestoData({...presupuestoData, fechaInicio: newIni, fechaFin: newFin})
+                        }}
                       />
                     </div>
                     <div className="space-y-2">

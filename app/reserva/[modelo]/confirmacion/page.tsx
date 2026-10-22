@@ -14,6 +14,7 @@ import { NuevoAutocaravanaIcon } from "@/components/icons/nuevo-autocaravana-ico
 import { useCounterStorage } from "@/lib/hooks/use-counter-storage"
 import { guardarReserva, generarId, obtenerReservaPorNumeroYModelo } from "@/lib/reservas-store"
 import { obtenerConfiguracion } from "@/lib/config-store"
+import { calcularDiasAlquiler } from "@/lib/utils-date"
 import type { ReservaCompleta } from "@/lib/types"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -76,10 +77,8 @@ export default function ConfirmacionReservaPage({ params }: { params: Promise<{ 
         const fEnt = isValidDate(fechaEntrega) ? fechaEntrega : new Date()
         const fDev = isValidDate(fechaDevolucion) ? fechaDevolucion : new Date()
         
-        const startDate = new Date(fEnt.getFullYear(), fEnt.getMonth(), fEnt.getDate())
-        const endDate = new Date(fDev.getFullYear(), fDev.getMonth(), fDev.getDate())
-        const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
-        const dias = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+        // Cálculo de días por calendario natural, blindado contra cambios de horario nocturnos
+        const dias = calcularDiasAlquiler(fEnt, fDev)
         
         const precioDiario = Number.parseFloat(parsedDetalles.precioDiario) || 0
         const suplemento = Number.parseFloat(parsedDetalles.suplemento) || 0

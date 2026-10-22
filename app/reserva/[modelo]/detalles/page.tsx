@@ -16,6 +16,7 @@ import { obtenerBloqueos } from "@/lib/bloqueos-store"
 import { obtenerConfiguracion } from "@/lib/config-store"
 import type { ReservaCompleta, ValeDescuento, Bloqueo } from "@/lib/types"
 import { isWithinInterval, isSameDay, startOfDay, endOfDay } from "date-fns"
+import { calcularDiasAlquiler } from "@/lib/utils-date"
 import { AlertCircle } from "lucide-react"
 
 import ReactDOM from "react-dom/client"
@@ -112,12 +113,8 @@ export default function DetallesReservaPage({ params }: { params: Promise<{ mode
   // --- EFECTO DE CÁLCULOS DINÁMICOS ---
   useEffect(() => {
     if (fechaEntrega && fechaDevolucion) {
-      // 1. Cálculo de días
-      const startDate = new Date(fechaEntrega.getFullYear(), fechaEntrega.getMonth(), fechaEntrega.getDate())
-      const endDate = new Date(fechaDevolucion.getFullYear(), fechaDevolucion.getMonth(), fechaDevolucion.getDate())
-      const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      const dias = diffDays + 1
+      // 1. Cálculo de días por calendario natural, blindado contra cambios de horario nocturnos
+      const dias = calcularDiasAlquiler(fechaEntrega, fechaDevolucion)
       setTotalDias(dias)
 
       // 2. Cálculo del total con cantidad y porcentaje
