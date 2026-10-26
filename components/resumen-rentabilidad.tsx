@@ -18,15 +18,15 @@ interface ResumenRentabilidadComponentProps {
 
 // Tipo para la ordenación
 type OrdenColumna = {
-  columna: "mes" | "beneficio"
+  columna: "fecha" | "beneficio"
   direccion: "asc" | "desc"
 }
 
 export function ResumenRentabilidadComponent({ filtros, usarRangoFechas = false }: ResumenRentabilidadComponentProps) {
   const [resumen, setResumen] = useState<ResumenRentabilidad[]>([])
   const [loading, setLoading] = useState(true)
-  // Estado para la ordenación
-  const [orden, setOrden] = useState<OrdenColumna>({ columna: "mes", direccion: "asc" })
+  // Estado para la ordenación: por defecto fecha más reciente primero
+  const [orden, setOrden] = useState<OrdenColumna>({ columna: "fecha", direccion: "desc" })
 
   // Calcular totales
   const ingresosTotales = resumen.reduce((sum, item) => sum + item.ingresosTotales, 0)
@@ -62,26 +62,42 @@ export function ResumenRentabilidadComponent({ filtros, usarRangoFechas = false 
     }
   }
 
-  // Función para cambiar la ordenación
-  const cambiarOrden = (columna: "mes" | "beneficio") => {
-    setOrden((prevOrden) => {
-      if (prevOrden.columna === columna) {
-        // Si ya estamos ordenando por esta columna, cambiar la dirección
-        return { columna, direccion: prevOrden.direccion === "asc" ? "desc" : "asc" }
-      } else {
-        // Si es una columna diferente, establecer la dirección por defecto
-        return { columna, direccion: columna === "mes" ? "asc" : "desc" }
+  // Funciones para cambiar la ordenación
+  const toggleOrdenFecha = () => {
+    setOrden((prev) => {
+      if (prev.columna === "fecha") {
+        return { columna: "fecha", direccion: prev.direccion === "desc" ? "asc" : "desc" }
       }
+      return { columna: "fecha", direccion: "desc" }
+    })
+  }
+
+  const toggleOrdenBeneficio = () => {
+    setOrden((prev) => {
+      if (prev.columna === "beneficio") {
+        return { columna: "beneficio", direccion: prev.direccion === "asc" ? "desc" : "asc" }
+      }
+      return { columna: "beneficio", direccion: "desc" }
     })
   }
 
   // Función para ordenar los datos según el estado actual
   const ordenarDatos = (datos: ResumenRentabilidad[]) => {
     return [...datos].sort((a, b) => {
-      if (orden.columna === "mes") {
-        // Ordenar por mes
-        const comparacion = a.mes - b.mes
-        return orden.direccion === "asc" ? comparacion : -comparacion
+      if (orden.columna === "fecha") {
+        // Ordenar cronológicamente considerando año y mes
+        const añoA = a.año || 0
+        const mesA = a.mes || 0
+        const añoB = b.año || 0
+        const mesB = b.mes || 0
+        const valorA = añoA * 100 + mesA
+        const valorB = añoB * 100 + mesB
+
+        if (valorA !== valorB) {
+          return orden.direccion === "desc" ? valorB - valorA : valorA - valorB
+        }
+        // Si coinciden en año y mes, ordenar por modelo
+        return (a.modelo || "").localeCompare(b.modelo || "")
       } else {
         // Ordenar por beneficio
         const comparacion = a.beneficioNeto - b.beneficioNeto
@@ -302,20 +318,30 @@ export function ResumenRentabilidadComponent({ filtros, usarRangoFechas = false 
                   <TableRow className="hover:bg-transparent border-slate-100">
                     <TableHead className="px-8 py-4">
                       <Button
+                        id="btn-orden-fecha-resumen"
                         variant="ghost"
-                        onClick={() => cambiarOrden("mes")}
+                        onClick={toggleOrdenFecha}
                         className="flex items-center gap-2 font-bold text-slate-700 p-0 h-auto hover:bg-transparent hover:text-caravalia-600 transition-colors"
+                        title={
+                          orden.columna === "fecha" && orden.direccion === "desc"
+                            ? "Orden: Más reciente primero. Clic para más antiguo primero"
+                            : "Orden: Más antiguo primero. Clic para más reciente primero"
+                        }
                       >
-                        MES
-                        {orden.columna === "mes" ? (
-                          orden.direccion === "asc" ? (
-                            <ArrowUp className="h-3.5 w-3.5" />
+                        <span>MES</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-xs font-bold shadow-sm">
+                          {orden.columna === "fecha" && orden.direccion === "asc" ? (
+                            <>
+                              <span className="text-caravalia-600 font-extrabold">▲</span>
+                              <span className="text-[10px] uppercase tracking-wider text-caravalia-700 font-black">Más antiguo</span>
+                            </>
                           ) : (
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          )
-                        ) : (
-                          <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
-                        )}
+                            <>
+                              <span className="text-caravalia-600 font-extrabold">▼</span>
+                              <span className="text-[10px] uppercase tracking-wider text-caravalia-700 font-black">Más reciente</span>
+                            </>
+                          )}
+                        </span>
                       </Button>
                     </TableHead>
                     <TableHead className="font-bold text-slate-700">VEHÍCULO</TableHead>
@@ -324,7 +350,7 @@ export function ResumenRentabilidadComponent({ filtros, usarRangoFechas = false 
                     <TableHead className="text-right">
                       <Button
                         variant="ghost"
-                        onClick={() => cambiarOrden("beneficio")}
+                        onClick={toggleOrdenBeneficio}
                         className="flex items-center gap-2 font-bold text-slate-700 p-0 h-auto ml-auto hover:bg-transparent hover:text-caravalia-600 transition-colors"
                       >
                         BENEFICIO
