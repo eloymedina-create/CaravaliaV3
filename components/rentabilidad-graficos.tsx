@@ -1,13 +1,11 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Download, FileText, Loader2, BarChart3 } from "lucide-react"
+import { Download, BarChart3 } from "lucide-react"
 import * as XLSX from "xlsx"
-import { jsPDF } from "jspdf"
-import html2canvas from "html2canvas"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import {
@@ -35,8 +33,6 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
   const [resumen, setResumen] = useState<ResumenRentabilidad[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("ingresos")
-  const [exportandoPdf, setExportandoPdf] = useState(false)
-  const graficosContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function cargarResumen() {
@@ -55,19 +51,27 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
     cargarResumen()
   }, [filtros, usarRangoFechas])
 
-  // Preparar datos para gráficos
-  const datosPorMes = resumen.reduce((acc: any[], item) => {
-    const mesExistente = acc.find((m) => m.mes === item.mes)
+  // Preparar datos para gráficos y evolución mensual
+  const anosPresentes = Array.from(new Set(resumen.map((r) => r.año)))
+  const esMultianual = anosPresentes.length > 1
 
-    if (mesExistente) {
-      mesExistente.ingresos += item.ingresosTotales
-      mesExistente.gastos += item.gastosTotales
-      mesExistente.beneficio += item.beneficioNeto
-      mesExistente.dias += item.diasAlquilados
+  const datosPorMes = resumen.reduce((acc: any[], item) => {
+    // Agrupar por mes y año para no mezclar datos del mismo mes de años distintos
+    const itemExistente = acc.find((m) => m.mes === item.mes && m.año === item.año)
+
+    if (itemExistente) {
+      itemExistente.ingresos += item.ingresosTotales
+      itemExistente.gastos += item.gastosTotales
+      itemExistente.beneficio += item.beneficioNeto
+      itemExistente.dias += item.diasAlquilados
     } else {
+      const nombreMes = formatearMes(item.mes)
       acc.push({
+        año: item.año,
         mes: item.mes,
-        nombreMes: formatearMes(item.mes),
+        nombreMes,
+        etiqueta: esMultianual ? `${nombreMes.slice(0, 3)} '${String(item.año).slice(-2)}` : nombreMes,
+        etiquetaCompleta: esMultianual ? `${nombreMes} ${item.año}` : nombreMes,
         ingresos: item.ingresosTotales,
         gastos: item.gastosTotales,
         beneficio: item.beneficioNeto,
@@ -78,8 +82,11 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
     return acc
   }, [])
 
-  // Ordenar por mes
-  datosPorMes.sort((a, b) => a.mes - b.mes)
+  // Ordenar cronológicamente (año ascendente, mes ascendente)
+  datosPorMes.sort((a, b) => {
+    if (a.año !== b.año) return a.año - b.año
+    return a.mes - b.mes
+  })
 
   // Datos para gráfico de distribución por modelo
   const datosPorModelo = resumen.reduce((acc: any[], item) => {
@@ -131,9 +138,10 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
 
   const CustomTooltip = ({ active, payload, label, unit = "€" }: any) => {
     if (active && payload && payload.length) {
+      const titulo = payload[0]?.payload?.etiquetaCompleta || label
       return (
         <div className="bg-white/95 backdrop-blur-sm p-4 rounded-2xl shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
-          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-50 pb-1">{label}</p>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-50 pb-1">{titulo}</p>
           {payload.map((entry: any, index: number) => (
             <div key={index} className="flex items-center gap-3 py-1">
               <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color || entry.fill }}></div>
@@ -169,8 +177,9 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
       [`Período: ${periodoStr}`],
       [`Generado: ${fechaGeneracion}`],
       [],
-      ["Mes", "Ingresos Totales (€)", "Gastos Totales (€)", "Beneficio Neto (€)", "Días Alquilados", "Precio Medio Diario (€/día)"],
+      ["Año", "Mes", "Ingresos Totales (€)", "Gastos Totales (€)", "Beneficio Neto (€)", "Días Alquilados", "Precio Medio Diario (€/día)"],
       ...datosPorMes.map((m) => [
+        m.año,
         m.nombreMes,
         Number(m.ingresos.toFixed(2)),
         Number(m.gastos.toFixed(2)),
@@ -181,6 +190,7 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
       [],
       [
         "TOTALES",
+        "",
         Number(totalIngresos.toFixed(2)),
         Number(totalGastos.toFixed(2)),
         Number(totalBeneficio.toFixed(2)),
@@ -189,7 +199,7 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
       ],
     ]
     const ws1 = XLSX.utils.aoa_to_sheet(hoja1Data)
-    ws1["!cols"] = [{ wch: 20 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 24 }]
+    ws1["!cols"] = [{ wch: 10 }, { wch: 18 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 24 }]
 
     // Hoja 2: Distribución por Modelo
     const hoja2Data = [
@@ -222,79 +232,6 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
     XLSX.writeFile(wb, nombreDescarga)
   }
 
-  // Exportar Informe Visual (PDF)
-  const exportarInformeVisualPDF = async () => {
-    if (!graficosContainerRef.current) return
-    setExportandoPdf(true)
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 350))
-
-      const canvas = await html2canvas(graficosContainerRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#f8fafc",
-      })
-
-      const imgData = canvas.toDataURL("image/png")
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      })
-
-      const pageWidth = pdf.internal.pageSize.getWidth() // 297mm
-      const pageHeight = pdf.internal.pageSize.getHeight() // 210mm
-
-      // Encabezado corporativo Caravalia
-      pdf.setFillColor(6, 59, 44) // #063b2c
-      pdf.rect(0, 0, pageWidth, 22, "F")
-
-      pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(14)
-      pdf.setFont("helvetica", "bold")
-      pdf.text("CARAVALIA — INFORME DE TENDENCIAS Y RENTABILIDAD", 14, 14)
-
-      const periodoStr = usarRangoFechas && filtros.fechaInicio && filtros.fechaFin
-        ? `${format(filtros.fechaInicio, "dd/MM/yyyy", { locale: es })} - ${format(filtros.fechaFin, "dd/MM/yyyy", { locale: es })}`
-        : filtros.mes ? `${formatearMes(filtros.mes)} ${filtros.año}` : `Año ${filtros.año}`
-
-      pdf.setFontSize(9)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(`Período: ${periodoStr} | Sección: ${activeTab.toUpperCase()}`, pageWidth - 14, 14, { align: "right" })
-
-      // Ajuste de proporciones
-      const imgWidth = pageWidth - 20
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      const maxHeight = pageHeight - 34
-      const finalHeight = Math.min(imgHeight, maxHeight)
-      const finalWidth = (canvas.width * finalHeight) / canvas.height
-
-      const xPos = (pageWidth - finalWidth) / 2
-      const yPos = 26
-
-      pdf.addImage(imgData, "PNG", xPos, yPos, finalWidth, finalHeight)
-
-      // Pie de página
-      pdf.setTextColor(148, 163, 184)
-      pdf.setFontSize(8)
-      pdf.text(
-        `Generado el ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })} • Caravalia Rentabilidad v3.0`,
-        14,
-        pageHeight - 6
-      )
-
-      const nombreArchivo = `Informe_Graficos_${activeTab}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`
-      pdf.save(nombreArchivo)
-    } catch (err) {
-      console.error("Error al exportar PDF de gráficos:", err)
-      alert("Hubo un error al generar el informe en PDF.")
-    } finally {
-      setExportandoPdf(false)
-    }
-  }
-
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -317,25 +254,10 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
               <Download className="h-4 w-4 text-emerald-600" />
               <span>Excel (.xlsx)</span>
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportarInformeVisualPDF}
-              disabled={exportandoPdf}
-              className="rounded-xl border-slate-200 font-bold text-slate-700 hover:bg-caravalia-50 hover:text-caravalia-700 hover:border-caravalia-200 transition-all flex items-center gap-2 shadow-sm"
-              title="Descargar informe visual en PDF con los diagramas mostrados"
-            >
-              {exportandoPdf ? (
-                <Loader2 className="h-4 w-4 animate-spin text-caravalia-600" />
-              ) : (
-                <FileText className="h-4 w-4 text-caravalia-600" />
-              )}
-              <span>{exportandoPdf ? "Generando PDF..." : "Informe Visual (PDF)"}</span>
-            </Button>
           </div>
         </div>
 
-        <div ref={graficosContainerRef} className="space-y-6 pt-2">
+        <div className="space-y-6 pt-2">
 
         <TabsContent value="ingresos" className="grid grid-cols-1 lg:grid-cols-2 gap-8 outline-none">
           <Card className="border-none shadow-xl shadow-blue-900/5 rounded-3xl overflow-hidden">
@@ -347,7 +269,7 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={datosPorMes} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="nombreMes" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
+                    <XAxis dataKey="etiqueta" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[6, 6, 0, 0]} barSize={40} />
@@ -408,7 +330,7 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={datosPorMes} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="nombreMes" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
+                    <XAxis dataKey="etiqueta" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="gastos" name="Gastos" fill="#f43f5e" radius={[6, 6, 0, 0]} barSize={40} />
@@ -469,7 +391,7 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={datosPorMes} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="nombreMes" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
+                    <XAxis dataKey="etiqueta" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="beneficio" name="Beneficio" fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={40} />
@@ -488,7 +410,7 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={datosPorMes} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="nombreMes" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
+                    <XAxis dataKey="etiqueta" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
@@ -510,7 +432,7 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={datosPorMes} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="nombreMes" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
+                    <XAxis dataKey="etiqueta" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12, fontWeight: 700}} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
                     <Tooltip content={<CustomTooltip unit="días" />} />
                     <Bar dataKey="dias" name="Días Alquilados" fill="#8b5cf6" radius={[6, 6, 0, 0]} barSize={40} />
