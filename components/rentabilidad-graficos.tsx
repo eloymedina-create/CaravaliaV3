@@ -1,8 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Download, FileText, Loader2, BarChart3 } from "lucide-react"
+import * as XLSX from "xlsx"
+import { jsPDF } from "jspdf"
+import html2canvas from "html2canvas"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 import {
   BarChart,
   Bar,
@@ -28,6 +35,8 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
   const [resumen, setResumen] = useState<ResumenRentabilidad[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("ingresos")
+  const [exportandoPdf, setExportandoPdf] = useState(false)
+  const graficosContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function cargarResumen() {
@@ -139,15 +148,194 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
     return null
   }
 
+  // Exportar Excel con datos multidimensionales
+  const exportarExcelGraficos = () => {
+    if (resumen.length === 0) return
+
+    const periodoStr = usarRangoFechas && filtros.fechaInicio && filtros.fechaFin
+      ? `${format(filtros.fechaInicio, "dd/MM/yyyy", { locale: es })} - ${format(filtros.fechaFin, "dd/MM/yyyy", { locale: es })}`
+      : filtros.mes ? `${formatearMes(filtros.mes)} ${filtros.año}` : `Año ${filtros.año}`
+    
+    const fechaGeneracion = format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })
+
+    const totalIngresos = datosPorMes.reduce((s, m) => s + m.ingresos, 0)
+    const totalGastos = datosPorMes.reduce((s, m) => s + m.gastos, 0)
+    const totalBeneficio = totalIngresos - totalGastos
+    const totalDias = datosPorMes.reduce((s, m) => s + m.dias, 0)
+
+    // Hoja 1: Evolución Mensual
+    const hoja1Data = [
+      ["CARAVALIA — EVOLUCIÓN MENSUAL"],
+      [`Período: ${periodoStr}`],
+      [`Generado: ${fechaGeneracion}`],
+      [],
+      ["Mes", "Ingresos Totales (€)", "Gastos Totales (€)", "Beneficio Neto (€)", "Días Alquilados", "Precio Medio Diario (€/día)"],
+      ...datosPorMes.map((m) => [
+        m.nombreMes,
+        Number(m.ingresos.toFixed(2)),
+        Number(m.gastos.toFixed(2)),
+        Number(m.beneficio.toFixed(2)),
+        m.dias,
+        m.dias > 0 ? Number((m.ingresos / m.dias).toFixed(2)) : 0,
+      ]),
+      [],
+      [
+        "TOTALES",
+        Number(totalIngresos.toFixed(2)),
+        Number(totalGastos.toFixed(2)),
+        Number(totalBeneficio.toFixed(2)),
+        totalDias,
+        totalDias > 0 ? Number((totalIngresos / totalDias).toFixed(2)) : 0,
+      ],
+    ]
+    const ws1 = XLSX.utils.aoa_to_sheet(hoja1Data)
+    ws1["!cols"] = [{ wch: 20 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 24 }]
+
+    // Hoja 2: Distribución por Modelo
+    const hoja2Data = [
+      ["CARAVALIA — MIX Y RENDIMIENTO POR MODELO"],
+      [`Período: ${periodoStr}`],
+      [],
+      ["Vehículo / Modelo", "Ingresos (€)", "% Cuota Ingresos", "Gastos (€)", "% Cuota Gastos", "Beneficio Neto (€)", "Días Alquilados", "% Días Alquilados"],
+      ...datosPorModelo.map((mod) => [
+        mod.modelo,
+        Number(mod.ingresos.toFixed(2)),
+        totalIngresos > 0 ? `${((mod.ingresos / totalIngresos) * 100).toFixed(1)}%` : "0%",
+        Number(mod.gastos.toFixed(2)),
+        totalGastos > 0 ? `${((mod.gastos / totalGastos) * 100).toFixed(1)}%` : "0%",
+        Number(mod.beneficio.toFixed(2)),
+        mod.dias,
+        totalDias > 0 ? `${((mod.dias / totalDias) * 100).toFixed(1)}%` : "0%",
+      ]),
+    ]
+    const ws2 = XLSX.utils.aoa_to_sheet(hoja2Data)
+    ws2["!cols"] = [{ wch: 26 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 18 }]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws1, "Evolucion_Mensual")
+    XLSX.utils.book_append_sheet(wb, ws2, "Mix_Por_Vehiculo")
+
+    const nombreDescarga = usarRangoFechas && filtros.fechaInicio && filtros.fechaFin
+      ? `Tendencias_Caravalia_${format(filtros.fechaInicio, "yyyyMMdd")}_${format(filtros.fechaFin, "yyyyMMdd")}.xlsx`
+      : `Tendencias_Caravalia_${filtros.año}_${filtros.mes || "todos"}.xlsx`
+
+    XLSX.writeFile(wb, nombreDescarga)
+  }
+
+  // Exportar Informe Visual (PDF)
+  const exportarInformeVisualPDF = async () => {
+    if (!graficosContainerRef.current) return
+    setExportandoPdf(true)
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 350))
+
+      const canvas = await html2canvas(graficosContainerRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#f8fafc",
+      })
+
+      const imgData = canvas.toDataURL("image/png")
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      })
+
+      const pageWidth = pdf.internal.pageSize.getWidth() // 297mm
+      const pageHeight = pdf.internal.pageSize.getHeight() // 210mm
+
+      // Encabezado corporativo Caravalia
+      pdf.setFillColor(6, 59, 44) // #063b2c
+      pdf.rect(0, 0, pageWidth, 22, "F")
+
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(14)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("CARAVALIA — INFORME DE TENDENCIAS Y RENTABILIDAD", 14, 14)
+
+      const periodoStr = usarRangoFechas && filtros.fechaInicio && filtros.fechaFin
+        ? `${format(filtros.fechaInicio, "dd/MM/yyyy", { locale: es })} - ${format(filtros.fechaFin, "dd/MM/yyyy", { locale: es })}`
+        : filtros.mes ? `${formatearMes(filtros.mes)} ${filtros.año}` : `Año ${filtros.año}`
+
+      pdf.setFontSize(9)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(`Período: ${periodoStr} | Sección: ${activeTab.toUpperCase()}`, pageWidth - 14, 14, { align: "right" })
+
+      // Ajuste de proporciones
+      const imgWidth = pageWidth - 20
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      const maxHeight = pageHeight - 34
+      const finalHeight = Math.min(imgHeight, maxHeight)
+      const finalWidth = (canvas.width * finalHeight) / canvas.height
+
+      const xPos = (pageWidth - finalWidth) / 2
+      const yPos = 26
+
+      pdf.addImage(imgData, "PNG", xPos, yPos, finalWidth, finalHeight)
+
+      // Pie de página
+      pdf.setTextColor(148, 163, 184)
+      pdf.setFontSize(8)
+      pdf.text(
+        `Generado el ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })} • Caravalia Rentabilidad v3.0`,
+        14,
+        pageHeight - 6
+      )
+
+      const nombreArchivo = `Informe_Graficos_${activeTab}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`
+      pdf.save(nombreArchivo)
+    } catch (err) {
+      console.error("Error al exportar PDF de gráficos:", err)
+      alert("Hubo un error al generar el informe en PDF.")
+    } finally {
+      setExportandoPdf(false)
+    }
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="inline-flex p-1 bg-slate-100/80 rounded-2xl border border-slate-200/50">
-          <TabsTrigger value="ingresos" className="px-5 py-2 rounded-xl text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-caravalia-600 data-[state=active]:shadow-sm transition-all">Ingresos</TabsTrigger>
-          <TabsTrigger value="gastos" className="px-5 py-2 rounded-xl text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-red-500 data-[state=active]:shadow-sm transition-all">Gastos</TabsTrigger>
-          <TabsTrigger value="beneficio" className="px-5 py-2 rounded-xl text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm transition-all">Balance</TabsTrigger>
-          <TabsTrigger value="ocupacion" className="px-5 py-2 rounded-xl text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all">Ocupación</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <TabsList className="inline-flex p-1 bg-slate-100/80 rounded-2xl border border-slate-200/50">
+            <TabsTrigger value="ingresos" className="px-5 py-2 rounded-xl text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-caravalia-600 data-[state=active]:shadow-sm transition-all">Ingresos</TabsTrigger>
+            <TabsTrigger value="gastos" className="px-5 py-2 rounded-xl text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-red-500 data-[state=active]:shadow-sm transition-all">Gastos</TabsTrigger>
+            <TabsTrigger value="beneficio" className="px-5 py-2 rounded-xl text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm transition-all">Balance</TabsTrigger>
+            <TabsTrigger value="ocupacion" className="px-5 py-2 rounded-xl text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all">Ocupación</TabsTrigger>
+          </TabsList>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportarExcelGraficos}
+              className="rounded-xl border-slate-200 font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all flex items-center gap-2 shadow-sm"
+              title="Descargar libro Excel con evolución mensual y mix de vehículos"
+            >
+              <Download className="h-4 w-4 text-emerald-600" />
+              <span>Excel (.xlsx)</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportarInformeVisualPDF}
+              disabled={exportandoPdf}
+              className="rounded-xl border-slate-200 font-bold text-slate-700 hover:bg-caravalia-50 hover:text-caravalia-700 hover:border-caravalia-200 transition-all flex items-center gap-2 shadow-sm"
+              title="Descargar informe visual en PDF con los diagramas mostrados"
+            >
+              {exportandoPdf ? (
+                <Loader2 className="h-4 w-4 animate-spin text-caravalia-600" />
+              ) : (
+                <FileText className="h-4 w-4 text-caravalia-600" />
+              )}
+              <span>{exportandoPdf ? "Generando PDF..." : "Informe Visual (PDF)"}</span>
+            </Button>
+          </div>
+        </div>
+
+        <div ref={graficosContainerRef} className="space-y-6 pt-2">
 
         <TabsContent value="ingresos" className="grid grid-cols-1 lg:grid-cols-2 gap-8 outline-none">
           <Card className="border-none shadow-xl shadow-blue-900/5 rounded-3xl overflow-hidden">
@@ -372,6 +560,7 @@ export function RentabilidadGraficos({ filtros, usarRangoFechas = false }: Renta
             </CardContent>
           </Card>
         </TabsContent>
+        </div>
       </Tabs>
     </div>
   )

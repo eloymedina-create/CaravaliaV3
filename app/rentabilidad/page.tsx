@@ -334,7 +334,12 @@ export default function RentabilidadPage() {
             </TabsContent>
 
             <TabsContent value="gastos" className="mt-0 outline-none">
-              <ListadoGastos filtros={filtros} onGastoActualizado={refrescarDatos} autocaravanas={autocaravanas} />
+              <ListadoGastos 
+                filtros={filtros} 
+                usarRangoFechas={usarRangoFechas}
+                onGastoActualizado={refrescarDatos} 
+                autocaravanas={autocaravanas} 
+              />
             </TabsContent>
 
             <TabsContent value="graficos" className="mt-0 outline-none">

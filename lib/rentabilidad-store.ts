@@ -1,6 +1,6 @@
 import type { Gasto, ResumenRentabilidad, FiltrosRentabilidad, Reserva } from "./types"
 import { v4 as uuidv4 } from "uuid"
-import { format, parse, isValid, getMonth, getYear, eachDayOfInterval, parseISO, isWithinInterval } from "date-fns"
+import { format, parse, isValid, getMonth, getYear, eachDayOfInterval, parseISO, isWithinInterval, startOfDay, endOfDay } from "date-fns"
 import { es } from "date-fns/locale"
 import { guardarGastoFirebase } from "./firebase-adapter"
 import { isFirebaseActivo } from "./firebase-client"
@@ -150,14 +150,17 @@ export function filtrarGastos(filtros: FiltrosRentabilidad, usarRangoFechas = fa
   console.log("Total de gastos:", gastos.length)
 
   return gastos.filter((gasto) => {
-    const fechaGasto = new Date(gasto.fecha)
+    const fechaGasto = parseFechaSegura(gasto.fecha) || new Date(gasto.fecha)
+    if (!fechaGasto || !isValid(fechaGasto)) return false
 
     if (usarRangoFechas && filtros.fechaInicio && filtros.fechaFin) {
-      // Filtrar por rango de fechas
+      // Filtrar por rango de fechas asegurando día completo inicio y fin
+      const inicio = startOfDay(filtros.fechaInicio)
+      const fin = endOfDay(filtros.fechaFin)
       if (
         !isWithinInterval(fechaGasto, {
-          start: filtros.fechaInicio,
-          end: filtros.fechaFin,
+          start: inicio,
+          end: fin,
         })
       ) {
         return false
@@ -174,47 +177,59 @@ export function filtrarGastos(filtros: FiltrosRentabilidad, usarRangoFechas = fa
       if (filtros.mes && mesGasto !== filtros.mes) return false
     }
 
-    // Filtrar por modelo
-    if (filtros.modeloId && gasto.modeloId !== filtros.modeloId) return false
+    // Filtrar por modelo (coincidencia con modeloId o nombre del modelo)
+    if (filtros.modeloId && gasto.modeloId !== filtros.modeloId && gasto.modelo !== filtros.modeloId) {
+      return false
+    }
 
     return true
   })
 }
 
-// Función para parsear fecha en formato dd/MM/yyyy
-function parseFechaSegura(fechaStr: string): Date | null {
+// Función para parsear fecha en formato dd/MM/yyyy o ISO de manera segura
+export function parseFechaSegura(fechaStr: any): Date | null {
   try {
     if (!fechaStr) return null
 
-    // Intentar parsear en formato dd/MM/yyyy
-    const partes = fechaStr.split("/")
-    if (partes.length === 3) {
-      const dia = Number.parseInt(partes[0], 10)
-      const mes = Number.parseInt(partes[1], 10) - 1 // Los meses en JS son 0-11
-      const año = Number.parseInt(partes[2], 10)
-
-      const fecha = new Date(año, mes, dia)
-
-      // Verificar que la fecha es válida
-      if (isValid(fecha)) {
-        return fecha
-      }
+    if (fechaStr instanceof Date) {
+      return isValid(fechaStr) ? fechaStr : null
     }
 
-    // Si no funciona, intentar con parse de date-fns
-    const fechaParseada = parse(fechaStr, "dd/MM/yyyy", new Date())
-    if (isValid(fechaParseada)) {
-      return fechaParseada
-    }
-
-    // Intentar con formato ISO
-    try {
-      const fechaISO = parseISO(fechaStr)
-      if (isValid(fechaISO)) {
-        return fechaISO
+    if (typeof fechaStr === "string") {
+      // Intentar directo con new Date
+      const fechaDirecta = new Date(fechaStr)
+      if (isValid(fechaDirecta)) {
+        return fechaDirecta
       }
-    } catch (e) {
-      // Ignorar error
+
+      // Intentar parsear en formato dd/MM/yyyy
+      const partes = fechaStr.split("/")
+      if (partes.length === 3) {
+        const dia = Number.parseInt(partes[0], 10)
+        const mes = Number.parseInt(partes[1], 10) - 1 // Los meses en JS son 0-11
+        const año = Number.parseInt(partes[2], 10)
+
+        const fecha = new Date(año, mes, dia)
+        if (isValid(fecha)) {
+          return fecha
+        }
+      }
+
+      // Si no funciona, intentar con parse de date-fns
+      const fechaParseada = parse(fechaStr, "dd/MM/yyyy", new Date())
+      if (isValid(fechaParseada)) {
+        return fechaParseada
+      }
+
+      // Intentar con formato ISO
+      try {
+        const fechaISO = parseISO(fechaStr)
+        if (isValid(fechaISO)) {
+          return fechaISO
+        }
+      } catch (e) {
+        // Ignorar error
+      }
     }
 
     return null
@@ -489,10 +504,12 @@ export async function calcularResumenRentabilidad(
 
         if (usarRangoFechas && filtros.fechaInicio && filtros.fechaFin) {
           // Filtrar por rango de fechas
+          const inicio = startOfDay(filtros.fechaInicio)
+          const fin = endOfDay(filtros.fechaFin)
           if (
             !isWithinInterval(dia, {
-              start: filtros.fechaInicio,
-              end: filtros.fechaFin,
+              start: inicio,
+              end: fin,
             })
           ) {
             coincideConFiltros = false

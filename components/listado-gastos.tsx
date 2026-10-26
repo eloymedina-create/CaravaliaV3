@@ -4,46 +4,72 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2, Download, PlusCircle, TrendingDown } from "lucide-react"
+import { Edit, Trash2, Download, PlusCircle, TrendingDown, ArrowDown, ArrowUp } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Gasto, FiltrosRentabilidad } from "@/lib/types"
-import { filtrarGastos, eliminarGasto, obtenerNombreModelo } from "@/lib/rentabilidad-store"
+import { filtrarGastos, eliminarGasto, obtenerNombreModelo, parseFechaSegura } from "@/lib/rentabilidad-store"
 import { GastosForm } from "./gastos-form"
+import * as XLSX from "xlsx"
+import { format } from "date-fns"
 
 interface ListadoGastosProps {
   filtros: FiltrosRentabilidad
+  usarRangoFechas?: boolean
   onGastoActualizado?: () => void
   autocaravanas?: { id: string; modelo: string }[]
 }
 
-export function ListadoGastos({ filtros, onGastoActualizado, autocaravanas }: ListadoGastosProps) {
+export function ListadoGastos({ filtros, usarRangoFechas = false, onGastoActualizado, autocaravanas }: ListadoGastosProps) {
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [loading, setLoading] = useState(true)
   const [gastoEditar, setGastoEditar] = useState<Gasto | null>(null)
   const [dialogoAbierto, setDialogoAbierto] = useState(false)
   const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false)
+  
+  // Estado para la ordenación de fecha: por defecto 'desc' (más reciente arriba)
+  const [ordenFecha, setOrdenFecha] = useState<"desc" | "asc">("desc")
 
-  useEffect(() => {
-    cargarGastos()
-  }, [filtros])
+  // Función para ordenar gastos por fecha
+  const ordenarGastos = (lista: Gasto[], direccion: "desc" | "asc") => {
+    return [...lista].sort((a, b) => {
+      const fechaA = parseFechaSegura(a.fecha) || new Date(a.fecha)
+      const fechaB = parseFechaSegura(b.fecha) || new Date(b.fecha)
+      const timeA = fechaA ? fechaA.getTime() : 0
+      const timeB = fechaB ? fechaB.getTime() : 0
+      return direccion === "desc" ? timeB - timeA : timeA - timeB
+    })
+  }
 
   const cargarGastos = () => {
     setLoading(true)
     try {
-      const gastosData = filtrarGastos(filtros)
+      const gastosData = filtrarGastos(filtros, usarRangoFechas)
 
       // Añadir el nombre del modelo a cada gasto
       const gastosConModelo = gastosData.map((gasto) => ({
         ...gasto,
-        modelo: obtenerNombreModelo(gasto.modeloId),
+        modelo: gasto.modelo || obtenerNombreModelo(gasto.modeloId),
       }))
 
-      setGastos(gastosConModelo)
+      // Ordenar por fecha por defecto más reciente primero
+      const gastosOrdenados = ordenarGastos(gastosConModelo, ordenFecha)
+
+      setGastos(gastosOrdenados)
     } catch (error) {
       console.error("Error al cargar gastos:", error)
     } finally {
       setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    cargarGastos()
+  }, [filtros, usarRangoFechas])
+
+  const toggleOrdenFecha = () => {
+    const nuevaDireccion = ordenFecha === "desc" ? "asc" : "desc"
+    setOrdenFecha(nuevaDireccion)
+    setGastos((prev) => ordenarGastos(prev, nuevaDireccion))
   }
 
   const handleEliminarGasto = async (id: string) => {
@@ -88,34 +114,34 @@ export function ListadoGastos({ filtros, onGastoActualizado, autocaravanas }: Li
     }
   }
 
-  const exportarCSV = () => {
+  const exportarExcel = () => {
     if (gastos.length === 0) return
 
-    // Crear cabeceras
-    const cabeceras = ["Fecha", "Modelo", "Concepto", "Importe", "Notas"]
+    const filas = gastos.map((gasto) => ({
+      Fecha: formatearFecha(gasto.fecha),
+      "Vehículo / Modelo": gasto.modelo || gasto.modeloId,
+      Concepto: gasto.concepto,
+      "Importe (€)": gasto.importe,
+      Notas: gasto.notas || "",
+    }))
 
-    // Crear filas de datos
-    const filas = gastos.map((gasto) => [
-      gasto.fecha,
-      gasto.modelo || gasto.modeloId,
-      gasto.concepto,
-      gasto.importe.toString(),
-      gasto.notas || "",
-    ])
+    const ws = XLSX.utils.json_to_sheet(filas)
+    ws["!cols"] = [
+      { wch: 14 },
+      { wch: 24 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 35 },
+    ]
 
-    // Combinar cabeceras y filas
-    const contenidoCSV = [cabeceras.join(","), ...filas.map((fila) => fila.join(","))].join("\n")
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Historial_Gastos")
 
-    // Crear blob y descargar
-    const blob = new Blob([contenidoCSV], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.setAttribute("href", url)
-    link.setAttribute("download", `gastos_${filtros.año}__${filtros.mes || "todos"}.csv`)
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    const nombreDescarga = usarRangoFechas && filtros.fechaInicio && filtros.fechaFin
+      ? `Gastos_Personalizado_${format(filtros.fechaInicio, "yyyyMMdd")}_${format(filtros.fechaFin, "yyyyMMdd")}.xlsx`
+      : `Gastos_${filtros.año}_${filtros.mes || "todos"}.xlsx`
+
+    XLSX.writeFile(wb, nombreDescarga)
   }
 
   // Formatear valores monetarios
@@ -129,7 +155,7 @@ export function ListadoGastos({ filtros, onGastoActualizado, autocaravanas }: Li
   // Formatear fecha
   const formatearFecha = (fechaStr: string) => {
     try {
-      const fecha = new Date(fechaStr)
+      const fecha = parseFechaSegura(fechaStr) || new Date(fechaStr)
       return new Intl.DateTimeFormat("es-ES").format(fecha)
     } catch (error) {
       return fechaStr
@@ -146,9 +172,14 @@ export function ListadoGastos({ filtros, onGastoActualizado, autocaravanas }: Li
           </div>
           <div className="flex items-center gap-3">
             {gastos.length > 0 && (
-              <Button variant="outline" size="sm" onClick={exportarCSV} className="rounded-xl border-slate-200 font-bold text-slate-600 hover:bg-slate-50 transition-all">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={exportarExcel} 
+                className="rounded-xl border-slate-200 font-bold text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Exportar (.xlsx)
               </Button>
             )}
             <Button 
@@ -166,7 +197,29 @@ export function ListadoGastos({ filtros, onGastoActualizado, autocaravanas }: Li
             <Table>
               <TableHeader className="bg-slate-50/30">
                 <TableRow className="hover:bg-transparent border-slate-100">
-                  <TableHead className="px-8 py-4 font-bold text-slate-700">FECHA</TableHead>
+                  <TableHead className="px-8 py-4">
+                    <Button
+                      variant="ghost"
+                      onClick={toggleOrdenFecha}
+                      className="flex items-center gap-2 font-bold text-slate-700 p-0 h-auto hover:bg-transparent hover:text-caravalia-600 transition-colors"
+                      title={ordenFecha === "desc" ? "Orden: Más reciente primero. Clic para más antiguo primero" : "Orden: Más antiguo primero. Clic para más reciente primero"}
+                    >
+                      <span>FECHA</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-xs font-bold shadow-sm">
+                        {ordenFecha === "desc" ? (
+                          <>
+                            <span className="text-caravalia-600 font-extrabold">▼</span>
+                            <span className="text-[10px] uppercase tracking-wider text-caravalia-700 font-black">Más reciente</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-caravalia-600 font-extrabold">▲</span>
+                            <span className="text-[10px] uppercase tracking-wider text-caravalia-700 font-black">Más antiguo</span>
+                          </>
+                        )}
+                      </span>
+                    </Button>
+                  </TableHead>
                   <TableHead className="font-bold text-slate-700">VEHÍCULO</TableHead>
                   <TableHead className="font-bold text-slate-700">CONCEPTO</TableHead>
                   <TableHead className="font-bold text-slate-700">IMPORTE</TableHead>

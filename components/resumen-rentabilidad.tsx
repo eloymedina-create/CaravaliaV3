@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DollarSign, TrendingDown, TrendingUp, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { DollarSign, TrendingDown, TrendingUp, Calendar, ArrowUpDown, ArrowUp, ArrowDown, Download } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import type { ResumenRentabilidad, FiltrosRentabilidad } from "@/lib/types"
 import { calcularResumenRentabilidad, formatearMes } from "@/lib/rentabilidad-store"
 import { Button } from "@/components/ui/button"
+import * as XLSX from "xlsx"
 
 interface ResumenRentabilidadComponentProps {
   filtros: FiltrosRentabilidad
@@ -91,6 +92,82 @@ export function ResumenRentabilidadComponent({ filtros, usarRangoFechas = false 
 
   // Obtener los datos ordenados
   const datosOrdenados = ordenarDatos(resumen)
+
+  // Exportación a Excel (.xlsx)
+  const exportarAExcel = () => {
+    if (datosOrdenados.length === 0) return
+
+    const periodoStr = obtenerTituloPeriodo()
+    const fechaGeneracion = format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })
+
+    // 1. Estructura de cabecera e información
+    const encabezadoInfo = [
+      ["CARAVALIA — INFORME DE RENTABILIDAD Y BALANCE HISTÓRICO"],
+      [`Período analizado: ${periodoStr}`],
+      [`Fecha de generación: ${fechaGeneracion}`],
+      [],
+      ["RESUMEN EJECUTIVO GLOBAL"],
+      ["Ingresos Totales (€)", "Gastos Totales (€)", "Beneficio Neto (€)", "Días Alquilados Totales", "Precio Medio Diario (€/día)"],
+      [
+        Number(ingresosTotales.toFixed(2)),
+        Number(gastosTotales.toFixed(2)),
+        Number(beneficioNeto.toFixed(2)),
+        diasAlquilados,
+        diasAlquilados > 0 ? Number((ingresosTotales / diasAlquilados).toFixed(2)) : 0,
+      ],
+      [],
+      ["DESGLOSE DETALLADO POR PERÍODO Y VEHÍCULO"],
+      ["Mes", "Año", "Vehículo / Modelo", "Ingresos (€)", "Gastos (€)", "Beneficio Neto (€)", "Precio Medio (€/día)", "Días Alquilados"],
+    ]
+
+    // 2. Filas de datos
+    const filasDatos = datosOrdenados.map((item) => [
+      formatearMes(item.mes),
+      item.año,
+      item.modelo,
+      Number(item.ingresosTotales.toFixed(2)),
+      Number(item.gastosTotales.toFixed(2)),
+      Number(item.beneficioNeto.toFixed(2)),
+      Number(item.precioMedioAlquiler.toFixed(2)),
+      item.diasAlquilados,
+    ])
+
+    // 3. Fila de totales
+    const filaTotales = [
+      "TOTALES",
+      "",
+      "",
+      Number(ingresosTotales.toFixed(2)),
+      Number(gastosTotales.toFixed(2)),
+      Number(beneficioNeto.toFixed(2)),
+      diasAlquilados > 0 ? Number((ingresosTotales / diasAlquilados).toFixed(2)) : 0,
+      diasAlquilados,
+    ]
+
+    const wsData = [...encabezadoInfo, ...filasDatos, [], filaTotales]
+    const ws = XLSX.utils.aoa_to_sheet(wsData)
+
+    // Ajuste de anchos de columna
+    ws["!cols"] = [
+      { wch: 22 }, // Mes / Concepto
+      { wch: 10 }, // Año
+      { wch: 28 }, // Modelo
+      { wch: 16 }, // Ingresos
+      { wch: 16 }, // Gastos
+      { wch: 18 }, // Beneficio
+      { wch: 20 }, // Precio Medio
+      { wch: 16 }, // Días
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Rentabilidad_Resumen")
+
+    const nombreArchivo = usarRangoFechas && filtros.fechaInicio && filtros.fechaFin
+      ? `Rentabilidad_Personalizado_${format(filtros.fechaInicio, "yyyyMMdd")}_${format(filtros.fechaFin, "yyyyMMdd")}.xlsx`
+      : `Rentabilidad_${filtros.año}_${filtros.mes || "todos"}.xlsx`
+
+    XLSX.writeFile(wb, nombreArchivo)
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -194,8 +271,22 @@ export function ResumenRentabilidadComponent({ filtros, usarRangoFechas = false 
             <h3 className="text-xl font-extrabold text-slate-900">Desglose de Rentabilidad</h3>
             <p className="text-sm font-medium text-slate-500 mt-1">Análisis detallado por mes y modelo de vehículo</p>
           </div>
-          <div className="px-3 py-1 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-400 shadow-sm">
-            MOSTRANDO {datosOrdenados.length} REGISTROS
+          <div className="flex items-center gap-3">
+            <div className="px-3 py-1 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-400 shadow-sm">
+              MOSTRANDO {datosOrdenados.length} REGISTROS
+            </div>
+            {datosOrdenados.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportarAExcel}
+                className="rounded-xl border-slate-200 font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all flex items-center gap-2 shadow-sm"
+                title="Descargar informe completo en formato Excel (.xlsx)"
+              >
+                <Download className="h-4 w-4 text-emerald-600" />
+                Exportar Excel (.xlsx)
+              </Button>
+            )}
           </div>
         </div>
         <CardContent className="p-0">
